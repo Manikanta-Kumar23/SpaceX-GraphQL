@@ -28,11 +28,12 @@ interface LaunchDataType {
     rocketName: string
     id: string
 }
+const variables = {offset: 0 , limit: 10}
 
 const Home = () => {
     const LAUNCH_DATES = gql`
-    query launch_dates {
-        launchesPast {
+    query launch_dates($offset: Int , $limit: Int) {
+        launchesPast(offset: $offset , limit: $limit)  {
             mission_name
             launch_date_utc
             rocket {
@@ -46,7 +47,28 @@ const Home = () => {
         }
     }
     `
-    const {data , loading , error} = useQuery(LAUNCH_DATES)
+    const {data , loading , fetchMore} = useQuery(LAUNCH_DATES , {variables})
+    const fetchNextPage = ({currentTarget}) => {
+        if (currentTarget.scrollTop + currentTarget.clientHeight >= currentTarget.scrollHeight) {
+            if (data.launchesPast.length < variables.limit) {
+                return
+            }
+            fetchMore({
+                variables: {
+                    offset: data.launchesPast.length,
+                    limit: data.launchesPast.length + 10
+                },
+                updateQuery: (prevResult , {fetchMoreResult}) => {
+                    if (!fetchMoreResult) return prevResult
+                    const newData = {
+                        ...prevResult ,
+                        launchesPast: [...prevResult.launchesPast , ...fetchMoreResult.launchesPast]
+                    }
+                    return newData
+                }
+            })
+        }
+    }
     const renderLaunchData = () => {
         if (data) {
             const launchData: LaunchDataType[] = data.launchesPast.map((each: BeforeFetchingData) => {
@@ -74,7 +96,7 @@ const Home = () => {
                     </thead>
                     <tbody>
                         {launchData.map((each: LaunchDataType) => (
-                            <tr>
+                            <tr key = {each.id}>
                                 <td>{each.missionName}</td>
                                 <td>{format(parseISO(each.launchDate), "d MMM, h:mm aa")}</td>
                                 <td>{each.rocketName}</td>
@@ -104,7 +126,7 @@ const Home = () => {
                   height="80"
                   width="80"
                   radius={9}
-                  color="#4D78FF"
+                  color="#4D78FF75"
                   type="ThreeDots"
                   visible={true}
                 />
@@ -112,7 +134,7 @@ const Home = () => {
         }
     }
     return (
-        <div className="background">
+        <div className="background"  onScroll={e => fetchNextPage(e)}>
             <div className="table-card">
                 {renderLaunchData()}
             </div>
